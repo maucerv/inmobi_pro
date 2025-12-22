@@ -12,7 +12,7 @@ RUN a2enmod rewrite
 ENV PORT=80
 
 # 4. Copiar el código fuente de tu carpeta 'src' a la carpeta pública de Apache
-COPY src/ /var/www/html/
+COPY /var/www/html/
 
 # 5. Ajustar permisos para que Apache pueda leer los archivos
 RUN chown -R www-data:www-data /var/www/html/ \
