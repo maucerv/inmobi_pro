@@ -13,7 +13,8 @@ RUN a2enmod rewrite
 # 3. Copiar los archivos de tu proyecto
 COPY . /var/www/html/
 
-# 4. Configurar permisos (CRÍTICO: SQLite necesita escribir en la carpeta raíz)
+# 4. Configurar permisos iniciales de carpetas
+# Damos permiso total a la carpeta raíz para que SQLite pueda crear archivos temporales
 RUN mkdir -p /var/www/html/uploads \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 777 /var/www/html
@@ -21,6 +22,9 @@ RUN mkdir -p /var/www/html/uploads \
 # 5. Exponer el puerto
 EXPOSE 80
 
-# 6. COMANDO DE INICIO (El cambio clave está aquí)
-# Ejecutamos semilla.php SOLO cuando el contenedor arranca, no antes.
-CMD php /var/www/html/semilla.php && apache2-foreground
+# 6. COMANDO DE INICIO (AQUÍ ESTÁ LA CORRECCIÓN)
+# Ejecutamos semilla, Y LUEGO cambiamos el dueño del archivo .sqlite a www-data
+CMD php /var/www/html/semilla.php && \
+    chown www-data:www-data /var/www/html/inmobiliaria.sqlite && \
+    chmod 666 /var/www/html/inmobiliaria.sqlite && \
+    apache2-foreground
