@@ -1,3 +1,8 @@
+<?php
+// Al principio del archivo, justo después de db.php
+require_once __DIR__ . '/db.php'; // Asegurar DB
+require_once __DIR__ . '/monitor.php'; // ACTIVAR EL MONITOR DE SEGURIDAD
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
