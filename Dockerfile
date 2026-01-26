@@ -24,6 +24,7 @@ RUN chown -R www-data:www-data /var/www/html \
 
 # 5. PUERTO
 EXPOSE 80
+# ... todo lo anterior igual ...
 
-# 6. ARRANQUE
-CMD ["apache2-foreground"]
+# CAMBIA EL CMD FINAL POR ESTE PARA VER LOS ARCHIVOS EN LOS LOGS:
+CMD ["sh", "-c", "echo '--- ARCHIVOS EN HTML ---'; ls -R /var/www/html; echo '--- FIN LISTA ---'; apache2-foreground"]
