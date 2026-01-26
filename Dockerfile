@@ -1,30 +1,34 @@
-# Usamos una versión oficial de PHP con Apache
 FROM php:8.2-apache
 
-# 1. INSTALACIÓN DE DRIVERS
-# Instalamos las librerías de SQLite y el driver de PHP necesario
+# 1. Instalar SQLite y Drivers necesarios
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     unzip \
     && docker-php-ext-install pdo pdo_sqlite
 
-# 2. CONFIGURACIÓN DE APACHE
-# Activamos mod_rewrite por si usas URLs amigables
+# 2. Configurar Apache (URLs amigables)
 RUN a2enmod rewrite
 
-# 3. COPIAR ARCHIVOS
-# Copiamos todo tu código al contenedor
+# 3. Copiar TODO al contenedor
 COPY . /var/www/html/
 
-# 4. PERMISOS (CRÍTICO PARA RENDER)
-# Damos permisos totales a la carpeta HTML para que PHP pueda
-# crear el archivo 'inmobiliaria_lite.db' sin errores de permisos.
+# 4. Asignar Permisos Totales (Para evitar errores de escritura en DB)
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 777 /var/www/html
 
-# 5. PUERTO
 EXPOSE 80
-# ... todo lo anterior igual ...
 
-# CAMBIA EL CMD FINAL POR ESTE PARA VER LOS ARCHIVOS EN LOS LOGS:
-CMD ["sh", "-c", "echo '--- ARCHIVOS EN HTML ---'; ls -R /var/www/html; echo '--- FIN LISTA ---'; apache2-foreground"]
+# 5. SCRIPT DE AUTO-LOCALIZACIÓN (LA SOLUCIÓN)
+# Busca el archivo 'index.php' en las carpetas y le dice a Apache que esa es la raíz.
+CMD ["/bin/bash", "-c", "\
+    echo '🔍 Buscando dónde está el archivo index.php...'; \
+    TARGET_DIR=$(dirname $(find /var/www/html -maxdepth 3 -name index.php | head -n 1)); \
+    if [ -z \"$TARGET_DIR\" ]; then \
+        echo '⚠️ No se encontró index.php, usando raíz por defecto.'; \
+        TARGET_DIR='/var/www/html'; \
+    fi; \
+    echo \"✅ Sitio encontrado en: $TARGET_DIR\"; \
+    echo \"🔧 Configurando Apache para usar esa carpeta...\"; \
+    sed -i \"s|/var/www/html|$TARGET_DIR|g\" /etc/apache2/sites-available/000-default.conf; \
+    echo '🚀 Iniciando Servidor...'; \
+    apache2-foreground"]
