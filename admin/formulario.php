@@ -34,17 +34,23 @@ if(isset($_GET['id'])) {
                 
                 <form action="guardar.php" method="POST">
                     <input type="hidden" name="id" value="<?= $p['id'] ?>">
-
-                    <div class="row mb-3">
-                        <div class="col-md-8">
-                            <label class="form-label fw-bold">Título del Anuncio</label>
-                            <input type="text" name="titulo" class="form-control" value="<?= htmlspecialchars($p['titulo']) ?>" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Precio (MXN)</label>
-                            <input type="number" name="precio" class="form-control" value="<?= $p['precio'] ?>" required>
-                        </div>
-                    </div>
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Tipo de Operación</label>
+        <select name="tipo_operacion" class="form-select">
+            <option value="venta" <?= ($p['tipo_operacion'] ?? '') == 'venta' ? 'selected' : '' ?>>En Venta</option>
+            <option value="renta" <?= ($p['tipo_operacion'] ?? '') == 'renta' ? 'selected' : '' ?>>En Renta</option>
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Precio</label>
+        <input type="number" name="precio" class="form-control" value="<?= $p['precio'] ?>" required>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-bold">Título</label>
+        <input type="text" name="titulo" class="form-control" value="<?= htmlspecialchars($p['titulo']) ?>" required>
+    </div>
+</div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Ubicación (Ciudad/Zona)</label>
