@@ -1,60 +1,62 @@
 <?php
 // includes/monitor.php
-if (session_status() === PHP_SESSION_NONE) session_start();
+// ESTE ARCHIVO ES TU FIREWALL Y CONTADOR DE VISITAS
 
-// Aseguramos que la conexión a DB exista
+// Aseguramos conexión a DB (si no está incluida ya)
 require_once __DIR__ . '/db.php';
 
-function monitor_log_safe($sql, $params) {
-    global $pdo;
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-    } catch (Exception $e) {
-        // Silencio: Si el log falla, no rompemos la página web
-        error_log("Error Monitor: " . $e->getMessage());
+$ip_actual = $_SERVER['REMOTE_ADDR'];
+$pagina_actual = $_SERVER['REQUEST_URI'];
+$fecha_hoy = date('Y-m-d');
+
+// --- 1. SISTEMA ANTI-INYECCIÓN SQL (WAF Básico) ---
+// Palabras prohibidas que suelen usar los hackers
+$patrones_maliciosos = [
+    'UNION SELECT', 'OR 1=1', 'DROP TABLE', 'DELETE FROM', 'INSERT INTO', 
+    '<script>', 'javascript:', 'xp_cmdshell', '--', '1=1'
+];
+
+// Función para escanear datos
+function escanear_amenaza($datos, $patrones) {
+    $datos_str = strtoupper(json_encode($datos));
+    foreach ($patrones as $patron) {
+        if (strpos($datos_str, $patron) !== false) {
+            return $patron; // Devuelve qué patrón encontró
+        }
     }
+    return false;
 }
 
-// 1. FIREWALL BÁSICO (WAF)
-function detectar_amenazas() {
-    $patrones = ['/union\s+select/i', '/drop\s+table/i', '/<script>/i', '/javascript:/i'];
-    $entrada = array_merge($_GET, $_POST);
+// Revisamos todo lo que entra por URL (GET) y Formularios (POST)
+$amenaza_get = escanear_amenaza($_GET, $patrones_maliciosos);
+$amenaza_post = escanear_amenaza($_POST, $patrones_maliciosos);
+
+if ($amenaza_get || $amenaza_post) {
+    $tipo_ataque = $amenaza_get ? "SQL Injection (URL) detectado: $amenaza_get" : "SQL Injection (Form) detectado: $amenaza_post";
     
-    foreach ($entrada as $key => $val) {
-        if (is_array($val)) continue;
-        foreach ($patrones as $patron) {
-            if (preg_match($patron, $val)) {
-                $ip = $_SERVER['REMOTE_ADDR'];
-                monitor_log_safe("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES ('ATAQUE_BLOQUEADO', ?, ?)", 
-                    ["Intento de inyección en '$key': $val", $ip]);
-                die("<h1>ACCESO DENEGADO</h1><p>Actividad sospechosa detectada.</p>");
-            }
-        }
-    }
-}
-
-// 2. REGISTRAR VISITA
-function registrar_trafico() {
-    global $pdo; // Necesitamos PDO para verificar select antes
+    // 1. Registramos el ataque en la base de datos
     try {
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $pagina = basename($_SERVER['PHP_SELF']);
-        $fecha = date('Y-m-d');
+        $stmt = $pdo->prepare("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES ('ATAQUE_BLOQUEADO', ?, ?)");
+        $stmt->execute([$tipo_ataque, $ip_actual]);
+    } catch (Exception $e) { /* Si falla el log, bloqueamos igual */ }
 
-        // Verificar si ya visitó hoy
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM visitas_web WHERE ip = ? AND fecha = ?");
-        $stmt->execute([$ip, $fecha]);
-        
-        if ($stmt->fetchColumn() == 0) {
-            monitor_log_safe("INSERT INTO visitas_web (ip, pagina, fecha) VALUES (?, ?, ?)", [$ip, $pagina, $fecha]);
-        }
-    } catch (Exception $e) {
-        // Ignorar errores de tráfico
-    }
+    // 2. Bloqueamos la ejecución INMEDIATAMENTE
+    die("<div style='background:red; color:white; padding:20px; font-family:sans-serif; text-align:center;'>
+            <h1>ACCESO BLOQUEADO</h1>
+            <p>El sistema de seguridad ha detectado una solicitud maliciosa.</p>
+            <p>Tu IP ($ip_actual) ha sido registrada.</p>
+         </div>");
 }
 
-// Ejecutar
-detectar_amenazas();
-registrar_trafico();
+// --- 2. CONTADOR DE VISITAS (Tráfico Legítimo) ---
+// Solo contamos si no es un archivo de admin o recursos estáticos
+if (strpos($pagina_actual, '/admin') === false && strpos($pagina_actual, '.css') === false) {
+    try {
+        // Registramos la visita
+        $stmt = $pdo->prepare("INSERT INTO visitas_web (ip, pagina, fecha) VALUES (?, ?, ?)");
+        $stmt->execute([$ip_actual, $pagina_actual, $fecha_hoy]);
+    } catch (Exception $e) {
+        // Ignorar errores de log de visitas para no detener la página
+    }
+}
 ?>
