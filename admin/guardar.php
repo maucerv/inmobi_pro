@@ -1,17 +1,34 @@
 <?php
+// admin/guardar.php
 session_start();
-if(!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
+
+// 1. SEGURIDAD: Solo usuarios logueados pueden guardar/borrar
+if(!isset($_SESSION['admin_id'])) { 
+    header('Location: login.php'); 
+    exit; 
+}
+
 require_once __DIR__ . '/../includes/db.php';
 
 // --- CASO 1: BORRAR PROPIEDAD ---
 if(isset($_GET['borrar'])) {
     $id = (int)$_GET['borrar'];
+    
+    // Verificamos si es SuperAdmin (Opcional: Si quieres que solo SuperAdmin borre, descomenta esto)
+    /*
+    if($_SESSION['admin_rol'] !== 'superadmin') {
+        die("Acceso denegado: Solo el SuperAdmin puede borrar.");
+    }
+    */
+
     $stmt = $pdo->prepare("DELETE FROM propiedades WHERE id = ?");
     $stmt->execute([$id]);
     
-    // Registrar log
+    // Registrar en log de seguridad
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $user = $_SESSION['admin_nombre'];
     $pdo->prepare("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES ('ELIMINACION', ?, ?)")
-        ->execute(["Se eliminó la propiedad ID: $id", $_SERVER['REMOTE_ADDR']]);
+        ->execute(["Usuario $user eliminó propiedad ID: $id", $ip]);
         
     header('Location: gestion_propiedades.php');
     exit;
@@ -28,43 +45,43 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $habitaciones = $_POST['habitaciones'];
     $banos = $_POST['banos'];
     $m2 = $_POST['m2'];
-    $imagen = $_POST['imagen']; // Guardamos la URL
+    $imagen = $_POST['imagen'];
     $descripcion = $_POST['descripcion'];
+    
+    // Nuevos campos
+    $tipo_operacion = $_POST['tipo_operacion']; // Venta o Renta
     $lat = !empty($_POST['lat']) ? $_POST['lat'] : null;
-    $lng = !empty($_POST['lng']) ? $_POST['lng'] : null;
-    // Checkbox: si no está marcado, no envía nada, así que validamos
+    $lng = !empty($_POST['lng']) ? $_POST['lng'] : null; // Usamos 'lng' consistente con db.php
     $destacado = isset($_POST['destacado']) ? 1 : 0;
 
+    // Preparar SQL dinámico
     if(empty($id)) {
-        // INSERTAR NUEVA
-        $sql = "INSERT INTO propiedades (titulo, precio, ubicacion, habitaciones, banos, m2, imagen, descripcion, lat, lng, destacado) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado];
-        
-        $accion = "CREACION";
-        $msg = "Se creó la propiedad: $titulo";
+        // INSERTAR (Nueva)
+        $sql = "INSERT INTO propiedades (titulo, precio, ubicacion, habitaciones, banos, m2, imagen, descripcion, lat, lng, destacado, tipo_operacion) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado, $tipo_operacion];
+        $accion_log = "CREACION";
     } else {
-        // ACTUALIZAR EXISTENTE
-        $sql = "UPDATE propiedades SET titulo=?, precio=?, ubicacion=?, habitaciones=?, banos=?, m2=?, imagen=?, descripcion=?, lat=?, lng=?, destacado=? 
+        // ACTUALIZAR (Existente)
+        $sql = "UPDATE propiedades SET titulo=?, precio=?, ubicacion=?, habitaciones=?, banos=?, m2=?, imagen=?, descripcion=?, lat=?, lng=?, destacado=?, tipo_operacion=? 
                 WHERE id=?";
-        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado, $id];
-        
-        $accion = "EDICION";
-        $msg = "Se actualizó la propiedad ID: $id";
+        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado, $tipo_operacion, $id];
+        $accion_log = "EDICION";
     }
 
     try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
 
-        // Registrar en log
+        // Registrar Log
+        $user = $_SESSION['admin_nombre'];
         $pdo->prepare("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES (?, ?, ?)")
-            ->execute([$accion, $msg, $_SERVER['REMOTE_ADDR']]);
+            ->execute([$accion_log, "$user gestionó: $titulo ($tipo_operacion)", $_SERVER['REMOTE_ADDR']]);
 
         header('Location: gestion_propiedades.php');
         exit;
     } catch (PDOException $e) {
-        die("Error al guardar: " . $e->getMessage());
+        die("Error al guardar en base de datos: " . $e->getMessage());
     }
 }
 ?>
