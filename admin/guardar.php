@@ -1,69 +1,70 @@
 <?php
 session_start();
 if(!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
-require '../includes/db.php';
+require_once __DIR__ . '/../includes/db.php';
 
-// Mostrar errores PHP para depuración
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-try {
-    // 1. Lógica para BORRAR
-    if(isset($_GET['borrar'])) {
-        $pdo->prepare("DELETE FROM propiedades WHERE id = ?")->execute([$_GET['borrar']]);
-        header('Location: gestion_propiedades.php');
-        exit;
-    }
-
-    // 2. Lógica para GUARDAR / EDITAR
-    if($_SERVER['REQUEST_METHOD'] == 'POST') {
-        $id = $_POST['id'];
-        // Recolectar datos y asegurar que lat/lon no sean vacíos (SQLite prefiere NULL o 0)
-        $lat = !empty($_POST['lat']) ? $_POST['lat'] : 0;
-        $lon = !empty($_POST['lon']) ? $_POST['lon'] : 0;
-        $destacado = isset($_POST['destacado']) ? 1 : 0;
-
-        $imagen = $_POST['imagen_url'];
+// --- CASO 1: BORRAR PROPIEDAD ---
+if(isset($_GET['borrar'])) {
+    $id = (int)$_GET['borrar'];
+    $stmt = $pdo->prepare("DELETE FROM propiedades WHERE id = ?");
+    $stmt->execute([$id]);
+    
+    // Registrar log
+    $pdo->prepare("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES ('ELIMINACION', ?, ?)")
+        ->execute(["Se eliminó la propiedad ID: $id", $_SERVER['REMOTE_ADDR']]);
         
-        // Manejo de archivo subido
-        if(isset($_FILES['imagen_file']) && $_FILES['imagen_file']['error'] == 0) {
-            $nombre = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['imagen_file']['name']);
-            $ruta_destino = "../uploads/" . $nombre;
-            if(move_uploaded_file($_FILES['imagen_file']['tmp_name'], $ruta_destino)) {
-                $imagen = "uploads/" . $nombre;
-            } else {
-                throw new Exception("Error al mover el archivo subido. Verifica permisos de carpeta uploads/.");
-            }
-        }
+    header('Location: gestion_propiedades.php');
+    exit;
+}
 
-        if(empty($id)) {
-            // INSERTAR
-            $sql = "INSERT INTO propiedades (titulo, precio, ubicacion, lat, lon, habitaciones, banos, descripcion, imagen, destacado, vistas) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
-            $params = [$_POST['titulo'], $_POST['precio'], $_POST['ubicacion'], $lat, $lon, $_POST['habitaciones'], $_POST['banos'], $_POST['descripcion'], $imagen, $destacado];
-            
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-        } else {
-            // ACTUALIZAR
-            $sql = "UPDATE propiedades SET titulo=?, precio=?, ubicacion=?, lat=?, lon=?, habitaciones=?, banos=?, descripcion=?, imagen=?, destacado=? WHERE id=?";
-            $params = [$_POST['titulo'], $_POST['precio'], $_POST['ubicacion'], $lat, $lon, $_POST['habitaciones'], $_POST['banos'], $_POST['descripcion'], $imagen, $destacado, $id];
-            
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-        }
+// --- CASO 2: GUARDAR / EDITAR ---
+if($_SERVER['REQUEST_METHOD'] == 'POST') {
+    
+    // Recibir datos del formulario
+    $id = $_POST['id'];
+    $titulo = $_POST['titulo'];
+    $precio = $_POST['precio'];
+    $ubicacion = $_POST['ubicacion'];
+    $habitaciones = $_POST['habitaciones'];
+    $banos = $_POST['banos'];
+    $m2 = $_POST['m2'];
+    $imagen = $_POST['imagen']; // Guardamos la URL
+    $descripcion = $_POST['descripcion'];
+    $lat = !empty($_POST['lat']) ? $_POST['lat'] : null;
+    $lng = !empty($_POST['lng']) ? $_POST['lng'] : null;
+    // Checkbox: si no está marcado, no envía nada, así que validamos
+    $destacado = isset($_POST['destacado']) ? 1 : 0;
 
-        // Si todo sale bien, redirigir
+    if(empty($id)) {
+        // INSERTAR NUEVA
+        $sql = "INSERT INTO propiedades (titulo, precio, ubicacion, habitaciones, banos, m2, imagen, descripcion, lat, lng, destacado) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado];
+        
+        $accion = "CREACION";
+        $msg = "Se creó la propiedad: $titulo";
+    } else {
+        // ACTUALIZAR EXISTENTE
+        $sql = "UPDATE propiedades SET titulo=?, precio=?, ubicacion=?, habitaciones=?, banos=?, m2=?, imagen=?, descripcion=?, lat=?, lng=?, destacado=? 
+                WHERE id=?";
+        $params = [$titulo, $precio, $ubicacion, $habitaciones, $banos, $m2, $imagen, $descripcion, $lat, $lng, $destacado, $id];
+        
+        $accion = "EDICION";
+        $msg = "Se actualizó la propiedad ID: $id";
+    }
+
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        // Registrar en log
+        $pdo->prepare("INSERT INTO logs_seguridad (tipo, mensaje, ip) VALUES (?, ?, ?)")
+            ->execute([$accion, $msg, $_SERVER['REMOTE_ADDR']]);
+
         header('Location: gestion_propiedades.php');
         exit;
+    } catch (PDOException $e) {
+        die("Error al guardar: " . $e->getMessage());
     }
-} catch (Exception $e) {
-    // SI FALLA, MUESTRA EL ERROR EN GRANDE
-    die("<div style='background:red; color:white; padding:20px; font-family:sans-serif;'>
-            <h1>Error al guardar</h1>
-            <p>" . $e->getMessage() . "</p>
-            <a href='formulario.php' style='color:yellow'>Volver</a>
-         </div>");
 }
 ?>
