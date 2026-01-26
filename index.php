@@ -1,40 +1,40 @@
 <?php 
-// includes/db.php ya se encarga de conectar o crear la BD
-require_once 'includes/db.php'; 
-include 'includes/header.php'; 
+// 1. CARGA SEGURA DE RECURSOS
+// Usamos __DIR__ para asegurar que encuentra los archivos
+require_once __DIR__ . '/includes/db.php';
+include __DIR__ . '/includes/header.php'; 
 
-// Consulta segura
+// 2. CONSULTA SEGURA
+// Si la tabla aún no se crea (raro con el nuevo db.php), esto lo maneja
 try {
     $stmt = $pdo->query("SELECT * FROM propiedades WHERE destacado = 1 LIMIT 6");
 } catch (Exception $e) {
-    echo "Error al cargar propiedades: " . $e->getMessage();
+    echo "<div class='alert alert-danger text-center m-5'>Error cargando propiedades: " . $e->getMessage() . "</div>";
     exit;
 }
 
-// Imagen por defecto si falla la carga
+// Imagen por defecto
 $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80";
 ?>
 
 <style>
+    /* VARIABLES DE DISEÑO */
     :root {
-        --color-gold: #c5a47e; /* Dorado más elegante, tipo Champagne */
+        --color-gold: #c5a47e; 
         --color-dark: #0f172a;
-        --color-text: #334155;
     }
 
-    body {
-        background-color: #f8fafc;
-    }
+    body { background-color: #f8fafc; }
 
-    /* === HERO SECTION === */
+    /* HERO SECTION */
     .hero-section {
         position: relative;
         height: 85vh;
-        min-height: 600px;
-        overflow: hidden;
+        min-height: 500px;
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: hidden;
     }
 
     .video-bg {
@@ -42,135 +42,92 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
         top: 50%; left: 50%;
         transform: translate(-50%, -50%);
         min-width: 100%; min-height: 100%;
-        width: auto; height: auto;
-        z-index: -2;
         object-fit: cover;
+        z-index: -2;
     }
 
-    /* Overlay gradiente profesional */
     .hero-overlay {
         position: absolute;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        background: linear-gradient(180deg, rgba(15,23,42,0.3) 0%, rgba(15,23,42,0.7) 100%);
+        background: linear-gradient(180deg, rgba(15,23,42,0.4) 0%, rgba(15,23,42,0.8) 100%);
         z-index: -1;
     }
 
-    .hero-title {
-        font-family: 'Playfair Display', serif;
-        font-size: 3.5rem;
-        line-height: 1.1;
-        margin-bottom: 1.5rem;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    }
-
-    /* === TARJETAS === */
+    /* TARJETAS */
     .card-property {
         border: none;
         border-radius: 12px;
         background: #fff;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
         height: 100%;
         overflow: hidden;
     }
 
     .card-property:hover {
         transform: translateY(-8px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 20px 30px rgba(0,0,0,0.1);
     }
 
-    .image-container {
+    .image-wrapper {
         position: relative;
-        height: 260px;
+        height: 250px;
         overflow: hidden;
     }
 
-    .prop-img {
-        width: 100%;
-        height: 100%;
+    .prop-bg {
+        width: 100%; height: 100%;
         background-size: cover;
         background-position: center;
-        transition: transform 0.7s ease;
+        transition: transform 0.5s ease;
     }
 
-    .card-property:hover .prop-img {
-        transform: scale(1.1);
-    }
+    .card-property:hover .prop-bg { transform: scale(1.1); }
 
     .price-tag {
         position: absolute;
-        bottom: 20px;
-        right: 0;
-        background: var(--color-dark);
-        color: #fff;
-        padding: 8px 20px 8px 15px;
-        border-radius: 4px 0 0 4px;
-        font-weight: 700;
-        font-size: 1.1rem;
-        box-shadow: -5px 5px 15px rgba(0,0,0,0.2);
+        bottom: 15px; right: 15px;
+        background: #fff;
+        color: var(--color-dark);
+        font-weight: 800;
+        padding: 5px 15px;
+        border-radius: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
     }
 
     .status-tag {
         position: absolute;
-        top: 20px;
-        left: 20px;
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(4px);
-        color: var(--color-dark);
-        padding: 5px 12px;
+        top: 15px; left: 15px;
+        background: rgba(15,23,42,0.9);
+        color: #fff;
+        font-size: 0.7rem;
+        padding: 4px 10px;
         border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
 
-    .card-body h5 {
-        font-family: 'Playfair Display', serif;
-        font-weight: 700;
-        color: var(--color-dark);
-    }
-
-    .feature-box {
+    .feature-list {
         display: flex;
         justify-content: space-between;
-        padding: 15px 0;
-        border-top: 1px solid #e2e8f0;
-        border-bottom: 1px solid #e2e8f0;
-        margin: 15px 0;
-    }
-
-    .feature-item {
-        text-align: center;
-        font-size: 0.85rem;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 15px;
+        margin-top: auto;
         color: #64748b;
+        font-size: 0.9rem;
     }
-
-    .feature-item i {
-        display: block;
-        font-size: 1.2rem;
-        color: var(--color-gold);
-        margin-bottom: 5px;
-    }
-
+    
     .btn-view {
-        background: transparent;
-        border: 2px solid var(--color-dark);
-        color: var(--color-dark);
-        font-weight: 600;
-        padding: 10px;
-        width: 100%;
-        transition: all 0.3s;
-        text-transform: uppercase;
-        font-size: 0.85rem;
-        letter-spacing: 1px;
-    }
-
-    .btn-view:hover {
         background: var(--color-dark);
-        color: #fff;
+        color: white;
+        width: 100%;
+        padding: 10px;
+        margin-top: 15px;
+        border: none;
+        transition: background 0.3s;
     }
+    .btn-view:hover { background: #334155; color: white; }
 </style>
 
 <div class="hero-section">
@@ -180,23 +137,19 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
     <div class="hero-overlay"></div>
 
     <div class="container text-center text-white position-relative" style="z-index: 2;">
-        <span class="text-uppercase ls-2 mb-3 d-block fw-bold" style="color: var(--color-gold); letter-spacing: 3px;">Real Estate & Living</span>
-        <h1 class="hero-title">Encuentra tu lugar<br>en el mundo</h1>
-        <div class="d-flex justify-content-center gap-3 mt-4">
-            <a href="mapa.php" class="btn btn-warning px-5 py-3 rounded-0 fw-bold shadow" style="background: var(--color-gold); border: none;">
-                VER MAPA
-            </a>
-            <a href="propiedades.php" class="btn btn-outline-light px-5 py-3 rounded-0 backdrop-blur">
-                CATÁLOGO
-            </a>
+        <span class="text-uppercase fw-bold mb-2 d-block text-warning ls-2">Real Estate</span>
+        <h1 class="display-3 fw-bold mb-4 font-serif">Encuentra tu lugar<br>en el mundo</h1>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="mapa.php" class="btn btn-warning px-5 py-3 rounded-pill fw-bold shadow">Ver Mapa</a>
+            <a href="propiedades.php" class="btn btn-outline-light px-5 py-3 rounded-pill">Catálogo</a>
         </div>
     </div>
 </div>
 
 <div class="container my-5 py-5">
     <div class="text-center mb-5">
-        <h2 class="display-5 fw-bold font-serif mb-2" style="font-family: 'Playfair Display', serif;">Propiedades Exclusivas</h2>
-        <div style="height: 3px; width: 70px; background: var(--color-gold); margin: 0 auto;"></div>
+        <h2 class="display-6 fw-bold">Propiedades Destacadas</h2>
+        <div class="bg-warning mx-auto mt-3" style="width: 60px; height: 3px;"></div>
     </div>
     
     <div class="row g-4">
@@ -205,38 +158,27 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
         ?>
         <div class="col-lg-4 col-md-6">
             <div class="card card-property">
-                <div class="image-container">
-                    <div class="prop-img" style="background-image: url('<?= htmlspecialchars($bgImage) ?>');"></div>
+                <div class="image-wrapper">
+                    <div class="prop-bg" style="background-image: url('<?= htmlspecialchars($bgImage) ?>');"></div>
                     <div class="status-tag">En Venta</div>
                     <div class="price-tag">$<?= number_format($row['precio']) ?></div>
                 </div>
 
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center text-muted small mb-2">
-                        <i class="bi bi-geo-alt-fill me-1" style="color: var(--color-gold);"></i>
+                <div class="card-body p-4 d-flex flex-column">
+                    <div class="text-muted small mb-2 d-flex align-items-center">
+                        <i class="bi bi-geo-alt-fill text-warning me-1"></i>
                         <?= htmlspecialchars($row['ubicacion']) ?>
                     </div>
 
-                    <h5 class="mb-3 text-truncate"><?= htmlspecialchars($row['titulo']) ?></h5>
+                    <h5 class="fw-bold text-dark mb-3"><?= htmlspecialchars($row['titulo']) ?></h5>
                     
-                    <div class="feature-box">
-                        <div class="feature-item">
-                            <i class="bi bi-door-closed"></i>
-                            <strong><?= $row['habitaciones'] ?></strong> Habs
-                        </div>
-                        <div class="feature-item">
-                            <i class="bi bi-droplet"></i>
-                            <strong><?= $row['banos'] ?></strong> Baños
-                        </div>
-                        <div class="feature-item">
-                            <i class="bi bi-arrows-angle-expand"></i>
-                            <strong>120</strong> m²
-                        </div>
+                    <div class="feature-list">
+                        <div><i class="bi bi-door-closed text-warning"></i> <?= $row['habitaciones'] ?> Habs</div>
+                        <div><i class="bi bi-droplet text-warning"></i> <?= $row['banos'] ?> Baños</div>
+                        <div><i class="bi bi-aspect-ratio text-warning"></i> 120 m²</div>
                     </div>
 
-                    <a href="detalle.php?id=<?= $row['id'] ?>" class="btn btn-view mt-2">
-                        Ver Propiedad
-                    </a>
+                    <a href="detalle.php?id=<?= $row['id'] ?>" class="btn btn-view rounded-2">Ver Detalles</a>
                 </div>
             </div>
         </div>
