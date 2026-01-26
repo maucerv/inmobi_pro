@@ -80,8 +80,7 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
                     <div class="col-4 col-md-3">
                         <div class="p-3 bg-light rounded-3">
                             <i class="bi bi-eye fs-3 text-primary"></i>
-                            <div class="fw-bold mt-1"><?= $prop['vistas'] ?> Vistas</div>
-                        </div>
+                            <div class="fw-bold mt-1"><?= $prop['vistas'] ?? 0 ?> Vistas</div>
                     </div>
                 </div>
             </div>
