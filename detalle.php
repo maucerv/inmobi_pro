@@ -1,29 +1,31 @@
 <?php 
-// 1. Activar reporte de errores para ver si algo falla
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// 1. Configuración de errores (Ocultar deprecations para producción)
+// Esto evita que mensajes de advertencia rompan tu diseño visual
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+ini_set('display_errors', 0); // En producción debería ser 0
 
-// 2. Incluir DB (Usamos require_once para evitar conflictos)
 require_once 'includes/db.php';
+include 'includes/header.php'; 
 
-// 3. Obtener ID y sanitizar
+// 2. Obtener ID y sanitizar
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// 4. Lógica de Contador de Visitas (Protegida con try-catch)
+// 3. Lógica de Contador de Visitas
 if($id > 0) {
     try {
-        $stmt_views = $pdo->prepare("UPDATE propiedades SET vistas = vistas + 1 WHERE id = ?");
-        $stmt_views->execute([$id]);
+        // Verificar si la columna existe antes de actualizar
+        $check = $pdo->query("PRAGMA table_info(propiedades)");
+        $cols = $check->fetchAll(PDO::FETCH_COLUMN, 1);
+        if(in_array('vistas', $cols)) {
+            $stmt_views = $pdo->prepare("UPDATE propiedades SET vistas = vistas + 1 WHERE id = ?");
+            $stmt_views->execute([$id]);
+        }
     } catch (Exception $e) {
-        // Si falla el contador, no detenemos la página, solo lo ignoramos.
+        // Ignorar error de contador para no romper la página
     }
 }
 
-// 5. Incluir Header (Esto carga monitor.php también)
-include 'includes/header.php'; 
-
-// 6. Obtener datos de la propiedad
+// 4. Obtener datos de la propiedad
 $stmt = $pdo->prepare("SELECT * FROM propiedades WHERE id = ?");
 $stmt->execute([$id]);
 $prop = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,7 +35,6 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
 
 <div class="container my-5">
     <?php if($prop): 
-        // Lógica de imagen: Si es URL externa o archivo local
         $imagen = !empty($prop['imagen']) ? $prop['imagen'] : $default_img;
     ?>
     
@@ -45,8 +46,12 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
                 <li class="breadcrumb-item active text-warning" aria-current="page">Detalle #<?= $prop['id'] ?></li>
             </ol>
         </nav>
-        <h1 class="display-4 fw-bold text-dark font-serif"><?= htmlspecialchars($prop['titulo']) ?></h1>
-        <p class="lead text-muted"><i class="bi bi-geo-alt-fill text-warning me-2"></i><?= htmlspecialchars($prop['ubicacion']) ?></p>
+        
+        <h1 class="display-4 fw-bold text-dark font-serif"><?= htmlspecialchars($prop['titulo'] ?? 'Sin Título') ?></h1>
+        <p class="lead text-muted">
+            <i class="bi bi-geo-alt-fill text-warning me-2"></i>
+            <?= htmlspecialchars($prop['ubicacion'] ?? 'Ubicación no especificada') ?>
+        </p>
     </div>
 
     <div class="row g-5">
@@ -58,7 +63,7 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
             <div class="bg-white p-4 rounded-4 shadow-sm mb-4 border border-light">
                 <h3 class="fw-bold mb-4 font-serif">Sobre esta residencia</h3>
                 <div class="text-secondary lh-lg" style="font-size: 1.05rem;">
-                    <?= nl2br(htmlspecialchars($prop['descripcion'])) ?>
+                    <?= nl2br(htmlspecialchars($prop['descripcion'] ?? 'Sin descripción disponible.')) ?>
                 </div>
             </div>
 
@@ -68,19 +73,26 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
                     <div class="col-4 col-md-3">
                         <div class="p-3 bg-light rounded-3">
                             <i class="bi bi-door-open fs-3 text-primary"></i>
-                            <div class="fw-bold mt-1"><?= $prop['habitaciones'] ?> Habs</div>
+                            <div class="fw-bold mt-1"><?= $prop['habitaciones'] ?? 0 ?> Habs</div>
                         </div>
                     </div>
                     <div class="col-4 col-md-3">
                         <div class="p-3 bg-light rounded-3">
                             <i class="bi bi-droplet fs-3 text-primary"></i>
-                            <div class="fw-bold mt-1"><?= $prop['banos'] ?> Baños</div>
+                            <div class="fw-bold mt-1"><?= $prop['banos'] ?? 0 ?> Baños</div>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-3">
+                        <div class="p-3 bg-light rounded-3">
+                            <i class="bi bi-aspect-ratio fs-3 text-primary"></i>
+                            <div class="fw-bold mt-1"><?= $prop['m2'] ?? 0 ?> m²</div>
                         </div>
                     </div>
                     <div class="col-4 col-md-3">
                         <div class="p-3 bg-light rounded-3">
                             <i class="bi bi-eye fs-3 text-primary"></i>
                             <div class="fw-bold mt-1"><?= $prop['vistas'] ?? 0 ?> Vistas</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -93,14 +105,14 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
                     <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">Disponible</span>
                 </div>
                 
-                <h2 class="text-primary fw-bold display-6 mb-4">$<?= number_format($prop['precio']) ?> <span class="fs-6 text-muted">MXN</span></h2>
+                <h2 class="text-primary fw-bold display-6 mb-4">
+                    $<?= number_format($prop['precio'] ?? 0) ?> 
+                    <span class="fs-6 text-muted">MXN</span>
+                </h2>
                 
                 <div class="d-grid gap-2">
                     <button class="btn btn-warning btn-lg shadow-sm text-white fw-bold">
                         <i class="bi bi-whatsapp me-2"></i> Contactar Visita
-                    </button>
-                    <button class="btn btn-outline-dark btn-lg">
-                        <i class="bi bi-envelope me-2"></i> Mensaje
                     </button>
                 </div>
 
@@ -122,11 +134,4 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
     <?php else: ?>
         <div class="alert alert-warning text-center p-5 rounded-4 shadow-sm mt-5">
             <h1 class="display-1 text-warning"><i class="bi bi-exclamation-circle"></i></h1>
-            <h3 class="fw-bold mt-3">Propiedad no encontrada</h3>
-            <p class="text-muted">No pudimos encontrar la propiedad con ID: <strong><?= htmlspecialchars($id) ?></strong></p>
-            <a href="propiedades.php" class="btn btn-dark mt-3">Volver al Catálogo</a>
-        </div>
-    <?php endif; ?>
-</div>
-
-<?php include 'includes/footer.php'; ?>
+            <h
