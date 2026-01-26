@@ -1,70 +1,110 @@
-<?php
-// includes/db.php
+<?php 
+require_once __DIR__ . '/includes/db.php';
+include __DIR__ . '/includes/header.php'; 
 
-// Ruta segura
-$db_file = __DIR__ . '/inmobiliaria_lite.db';
-
+// Obtenemos solo las propiedades que tienen coordenadas
 try {
-    $pdo = new PDO("sqlite:" . $db_file);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-
-    // 1. CREACIÓN BASE (Si no existe)
-    // Agregamos lat y lng a la definición inicial por si es una instalación limpia
-    $pdo->exec("CREATE TABLE IF NOT EXISTS propiedades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        titulo TEXT NOT NULL,
-        precio DECIMAL(10,2) NOT NULL,
-        ubicacion TEXT NOT NULL,
-        habitaciones INTEGER,
-        banos DECIMAL(3,1),
-        m2 INTEGER DEFAULT 120,
-        imagen TEXT,
-        descripcion TEXT,
-        lat DECIMAL(10,8),
-        lng DECIMAL(11,8),
-        destacado INTEGER DEFAULT 0
-    )");
-
-    // 2. PARCHE PARA BASE DE DATOS EXISTENTE (Solución a tu error)
-    // Intentamos seleccionar 'lat'. Si falla, significa que la tabla vieja existe pero sin coordenadas.
-    try {
-        $pdo->query("SELECT lat FROM propiedades LIMIT 1");
-    } catch (Exception $e) {
-        // Si entra aquí, es porque faltan las columnas. Las agregamos.
-        $pdo->exec("ALTER TABLE propiedades ADD COLUMN lat DECIMAL(10,8)");
-        $pdo->exec("ALTER TABLE propiedades ADD COLUMN lng DECIMAL(11,8)");
-        
-        // Actualizamos las propiedades de ejemplo con coordenadas reales
-        // Polanco, CDMX
-        $pdo->exec("UPDATE propiedades SET lat=19.432608, lng=-99.133209 WHERE ubicacion LIKE '%Polanco%' OR titulo LIKE '%Penthouse%'");
-        // Juriquilla, QRO
-        $pdo->exec("UPDATE propiedades SET lat=20.702958, lng=-100.444791 WHERE ubicacion LIKE '%Juriquilla%' OR titulo LIKE '%Residencia%'");
-        // Centro, GDL
-        $pdo->exec("UPDATE propiedades SET lat=20.659698, lng=-103.349609 WHERE ubicacion LIKE '%GDL%' OR titulo LIKE '%Loft%'");
-    }
-
-    // Creación de tabla usuarios (si falta)
-    $pdo->exec("CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        nombre TEXT
-    )");
-
-    // 3. AUTO-RELLENO (Solo si está vacía)
-    $stmt = $pdo->query("SELECT COUNT(*) FROM propiedades");
-    if ($stmt->fetchColumn() == 0) {
-        // Insertamos con coordenadas
-        $sql = "INSERT INTO propiedades (titulo, precio, ubicacion, habitaciones, banos, m2, imagen, destacado, lat, lng) VALUES 
-        ('Penthouse Luxury View', 12500000, 'Polanco, CDMX', 3, 3.5, 210, 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750', 1, 19.435, -99.195),
-        ('Residencia Moderna', 8900000, 'Juriquilla, QRO', 4, 4, 350, 'https://images.unsplash.com/photo-1600596542815-e36cb06c378e', 1, 20.693, -100.443),
-        ('Loft Industrial', 4500000, 'Centro, GDL', 1, 1.5, 95, 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c', 1, 20.676, -103.347)";
-        $pdo->exec($sql);
-    }
-
-} catch (PDOException $e) {
-    echo "Error DB: " . $e->getMessage();
-    exit;
+    $stmt = $pdo->query("SELECT * FROM propiedades WHERE lat IS NOT NULL AND lng IS NOT NULL");
+    $propiedades = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $propiedades = [];
 }
 ?>
+
+<style>
+    #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        z-index: 1;
+    }
+    .leaflet-popup-content-wrapper {
+        border-radius: 10px;
+        padding: 0;
+        overflow: hidden;
+    }
+    .leaflet-popup-content {
+        margin: 0;
+        width: 250px !important;
+    }
+    .popup-img {
+        width: 100%;
+        height: 140px;
+        background-size: cover;
+        background-position: center;
+    }
+    .popup-info {
+        padding: 15px;
+    }
+</style>
+
+<div class="container my-5 pt-4">
+    <div class="text-center mb-4">
+        <h2 class="display-5 fw-bold font-serif">Ubicación de Propiedades</h2>
+        <p class="text-muted">Explora nuestras oportunidades en el mapa interactivo</p>
+    </div>
+
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 1. Inicializar el mapa (Centrado en México)
+    var map = L.map('map').setView([20.0, -100.0], 5);
+
+    // 2. Cargar capas de OpenStreetMap (Estilo claro/minimalista)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    // 3. Icono personalizado (Opcional, usa el default si falla)
+    var customIcon = L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34]
+    });
+
+    // 4. Datos de PHP a Javascript
+    var propiedades = <?php echo json_encode($propiedades); ?>;
+
+    // 5. Crear marcadores
+    var bounds = []; // Para ajustar el zoom automáticamente
+
+    propiedades.forEach(function(prop) {
+        if(prop.lat && prop.lng) {
+            var lat = parseFloat(prop.lat);
+            var lng = parseFloat(prop.lng);
+            
+            // Crear contenido del popup (HTML)
+            var popupContent = `
+                <div class="popup-card">
+                    <div class="popup-img" style="background-image: url('${prop.imagen}');"></div>
+                    <div class="popup-info">
+                        <h6 class="fw-bold mb-1">${prop.titulo}</h6>
+                        <span class="badge bg-dark mb-2">$${new Intl.NumberFormat().format(prop.precio)}</span>
+                        <br>
+                        <a href="detalle.php?id=${prop.id}" class="btn btn-sm btn-outline-dark w-100 mt-2">Ver Detalles</a>
+                    </div>
+                </div>
+            `;
+
+            var marker = L.marker([lat, lng], {icon: customIcon})
+                .addTo(map)
+                .bindPopup(popupContent);
+                
+            bounds.push([lat, lng]);
+        }
+    });
+
+    // 6. Ajustar vista para ver todos los marcadores
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, {padding: [50, 50]});
+    }
+</script>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
