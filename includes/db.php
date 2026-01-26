@@ -1,17 +1,20 @@
 <?php
 // includes/db.php
-// Definimos que la base de datos es un archivo local
-$db_file = __DIR__ . '/../inmobiliaria.sqlite';
+
+// Detectar si estamos en Render o en Local
+$host = getenv('DB_HOST') ?: 'localhost';
+$db   = getenv('DB_NAME') ?: 'nombre_de_tu_bd_local';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: ''; // En XAMPP suele ser vacío
+$port = getenv('DB_PORT') ?: '3306';
+
+$dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
 
 try {
-    // Usamos el driver de SQLite en lugar de MySQL
-    $pdo = new PDO("sqlite:" . $db_file);
-    
-    // Configuración de errores y claves foráneas
+    $pdo = new PDO($dsn, $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec("PRAGMA foreign_keys = ON;");
-
 } catch (PDOException $e) {
-    die("<h3>Error de sistema:</h3> " . $e->getMessage());
+    // En producción, no mostrar el error real al usuario
+    die("Error de conexión: " . $e->getMessage());
 }
 ?>
