@@ -1,10 +1,10 @@
 <?php
 // includes/header.php
-// Usamos __DIR__ para asegurar que encuentre db.php sin importar quién incluya este archivo
 require_once __DIR__ . '/db.php'; 
 
-// Comentamos monitor.php para evitar errores si el archivo falta
-// require_once __DIR__ . '/monitor.php'; 
+// --- AQUÍ ACTIVAMOS LA SEGURIDAD ---
+require_once __DIR__ . '/monitor.php'; 
+// -----------------------------------
 ?>
 <!DOCTYPE html>
 <html lang="es">
