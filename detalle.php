@@ -1,8 +1,7 @@
 <?php 
-// 1. Configuración de errores (Ocultar deprecations para producción)
-// Esto evita que mensajes de advertencia rompan tu diseño visual
+// 1. Configuración para evitar errores visuales
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
-ini_set('display_errors', 0); // En producción debería ser 0
+ini_set('display_errors', 0);
 
 require_once 'includes/db.php';
 include 'includes/header.php'; 
@@ -10,10 +9,10 @@ include 'includes/header.php';
 // 2. Obtener ID y sanitizar
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// 3. Lógica de Contador de Visitas
+// 3. Lógica de Contador de Visitas (Auto-Reparable)
 if($id > 0) {
     try {
-        // Verificar si la columna existe antes de actualizar
+        // Verificar si existe la columna antes de sumar
         $check = $pdo->query("PRAGMA table_info(propiedades)");
         $cols = $check->fetchAll(PDO::FETCH_COLUMN, 1);
         if(in_array('vistas', $cols)) {
@@ -21,7 +20,7 @@ if($id > 0) {
             $stmt_views->execute([$id]);
         }
     } catch (Exception $e) {
-        // Ignorar error de contador para no romper la página
+        // Silenciar error para no romper la web
     }
 }
 
@@ -34,6 +33,7 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
 ?>
 
 <div class="container my-5">
+    
     <?php if($prop): 
         $imagen = !empty($prop['imagen']) ? $prop['imagen'] : $default_img;
     ?>
@@ -134,4 +134,12 @@ $default_img = "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?aut
     <?php else: ?>
         <div class="alert alert-warning text-center p-5 rounded-4 shadow-sm mt-5">
             <h1 class="display-1 text-warning"><i class="bi bi-exclamation-circle"></i></h1>
-            <h
+            <h3 class="fw-bold mt-3">Propiedad no encontrada</h3>
+            <p class="text-muted">No pudimos encontrar la propiedad con ID: <strong><?= htmlspecialchars($id) ?></strong></p>
+            <a href="propiedades.php" class="btn btn-dark mt-3">Volver al Catálogo</a>
+        </div>
+    <?php endif; ?>
+
+</div>
+
+<?php include 'includes/footer.php'; ?>
