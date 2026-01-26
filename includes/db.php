@@ -6,11 +6,10 @@ if (!in_array("sqlite", PDO::getAvailableDrivers())) {
     die("Error Crítico: Falta el driver pdo_sqlite en el servidor.");
 }
 
-// 2. Ruta inteligente (usa /tmp si no hay permisos en la carpeta actual)
+// 2. Ruta inteligente
 $filename = 'inmobiliaria_lite.db';
 $main_path = __DIR__ . '/' . $filename;
 $tmp_path  = '/tmp/' . $filename;
-
 $db_file = (is_writable(__DIR__)) ? $main_path : $tmp_path;
 
 try {
@@ -18,9 +17,9 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-    // --- AUTO-CREACIÓN DE TABLAS ---
+    // --- TABLAS ---
 
-    // 1. Propiedades (Catálogo)
+    // 1. Propiedades (Agregamos 'tipo_operacion')
     $pdo->exec("CREATE TABLE IF NOT EXISTS propiedades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT NOT NULL,
@@ -34,47 +33,40 @@ try {
         lat DECIMAL(10,8),
         lng DECIMAL(11,8),
         vistas INTEGER DEFAULT 0,
-        destacado INTEGER DEFAULT 0
+        destacado INTEGER DEFAULT 0,
+        tipo_operacion TEXT DEFAULT 'venta' 
     )");
 
-    // 2. Usuarios (Admin)
+    // 2. Usuarios (Rol: 'superadmin' o 'editor')
     $pdo->exec("CREATE TABLE IF NOT EXISTS usuarios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         nombre TEXT,
-        rol TEXT DEFAULT 'admin'
+        rol TEXT DEFAULT 'editor'
     )");
 
-    // 3. Tablas de Seguridad y Estadísticas (SOLUCIÓN A TU ERROR)
-    $pdo->exec("CREATE TABLE IF NOT EXISTS visitas_web (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ip TEXT,
-        fecha DATE DEFAULT (DATE('now')),
-        pagina TEXT
-    )");
+    // 3. Logs y Visitas
+    $pdo->exec("CREATE TABLE IF NOT EXISTS visitas_web (id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT, fecha DATE DEFAULT (DATE('now')), pagina TEXT)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS logs_seguridad (id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, mensaje TEXT, ip TEXT, fecha DATETIME DEFAULT CURRENT_TIMESTAMP)");
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS logs_seguridad (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo TEXT,
-        mensaje TEXT,
-        ip TEXT,
-        fecha DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    // --- PARCHE PARA BASE EXISTENTE ---
+    // Si ya tienes datos, esto agrega la columna 'tipo_operacion' si falta
+    try {
+        $pdo->query("SELECT tipo_operacion FROM propiedades LIMIT 1");
+    } catch (Exception $e) {
+        $pdo->exec("ALTER TABLE propiedades ADD COLUMN tipo_operacion TEXT DEFAULT 'venta'");
+    }
 
-    // --- AUTO-RELLENO INICIAL ---
-    $stmt = $pdo->query("SELECT COUNT(*) FROM propiedades");
+    // --- AUTO-RELLENO ---
+    $stmt = $pdo->query("SELECT COUNT(*) FROM usuarios");
     if ($stmt->fetchColumn() == 0) {
-        // Propiedades base
-        $pdo->exec("INSERT INTO propiedades (titulo, precio, ubicacion, habitaciones, banos, m2, imagen, destacado, lat, lng) VALUES 
-        ('Penthouse Luxury View', 12500000, 'Polanco, CDMX', 3, 3.5, 210, 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750', 1, 19.435, -99.195),
-        ('Residencia Moderna', 8900000, 'Juriquilla, QRO', 4, 4, 350, 'https://images.unsplash.com/photo-1600596542815-e36cb06c378e', 1, 20.693, -100.443)");
-        
-        // Usuario Admin por defecto
-        $pdo->exec("INSERT INTO usuarios (email, password, nombre, rol) VALUES ('admin@test.com', '123456', 'Administrador', 'SuperAdmin')");
+        // Usuario SuperAdmin por defecto (CÁMBIALO AL ENTRAR)
+        // Pass: 123456
+        $pdo->exec("INSERT INTO usuarios (email, password, nombre, rol) VALUES ('admin@test.com', '123456', 'Super Admin', 'superadmin')");
     }
 
 } catch (PDOException $e) {
-    die("Error de Base de Datos: " . $e->getMessage());
+    die("Error DB: " . $e->getMessage());
 }
 ?>
