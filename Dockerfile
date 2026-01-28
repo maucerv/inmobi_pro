@@ -1,20 +1,18 @@
 FROM php:8.2-apache
 
-# 1. Instalar SQLite y Drivers necesarios
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
-    unzip \
     && docker-php-ext-install pdo pdo_sqlite
 
-# 2. Configurar Apache (URLs amigables)
 RUN a2enmod rewrite
 
-# 3. Copiar TODO al contenedor
 COPY . /var/www/html/
 
-# 4. Asignar Permisos Totales (Para evitar errores de escritura en DB)
+# Permisos seguros: El servidor es dueño, pero no damos permisos totales a todo el mundo
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 777 /var/www/html
+    && find /var/www/html -type d -exec chmod 755 {} \; \
+    && find /var/www/html -type f -exec chmod 644 {} \; \
+    && chmod 775 /var/www/html/includes # Para permitir escribir la DB
 
 EXPOSE 80
 
