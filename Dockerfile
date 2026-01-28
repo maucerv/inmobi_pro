@@ -1,32 +1,29 @@
 FROM php:8.2-apache
 
+# 1. Instalar dependencias y drivers de SQLite
 RUN apt-get update && apt-get install -y \
     libsqlite3-dev \
     && docker-php-ext-install pdo pdo_sqlite
 
+# 2. Habilitar mod_rewrite para URLs amigables
 RUN a2enmod rewrite
 
+# 3. Configurar el DocumentRoot de Apache
+# Render espera que tu app esté en /var/www/html por defecto
+ENV APACHE_DOCUMENT_ROOT /var/www/html
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# 4. Copiar los archivos del proyecto
 COPY . /var/www/html/
 
-# Permisos seguros: El servidor es dueño, pero no damos permisos totales a todo el mundo
+# 5. Permisos de escritura específicos para la base de datos SQLite
+# En lugar de 777 a todo, damos permisos al usuario de apache solo donde es necesario
 RUN chown -R www-data:www-data /var/www/html \
-    && find /var/www/html -type d -exec chmod 755 {} \; \
-    && find /var/www/html -type f -exec chmod 644 {} \; \
-    && chmod 775 /var/www/html/includes # Para permitir escribir la DB
+    && chmod -R 755 /var/www/html \
+    && chmod -R 775 /var/www/html/includes
 
+# El puerto 80 es el estándar que Render busca
 EXPOSE 80
 
-# 5. SCRIPT DE AUTO-LOCALIZACIÓN (LA SOLUCIÓN)
-# Busca el archivo 'index.php' en las carpetas y le dice a Apache que esa es la raíz.
-CMD ["/bin/bash", "-c", "\
-    echo '🔍 Buscando dónde está el archivo index.php...'; \
-    TARGET_DIR=$(dirname $(find /var/www/html -maxdepth 3 -name index.php | head -n 1)); \
-    if [ -z \"$TARGET_DIR\" ]; then \
-        echo '⚠️ No se encontró index.php, usando raíz por defecto.'; \
-        TARGET_DIR='/var/www/html'; \
-    fi; \
-    echo \"✅ Sitio encontrado en: $TARGET_DIR\"; \
-    echo \"🔧 Configurando Apache para usar esa carpeta...\"; \
-    sed -i \"s|/var/www/html|$TARGET_DIR|g\" /etc/apache2/sites-available/000-default.conf; \
-    echo '🚀 Iniciando Servidor...'; \
-    apache2-foreground"]
+CMD ["apache2-foreground"]
