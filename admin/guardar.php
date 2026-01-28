@@ -1,4 +1,5 @@
 <?php
+
 // admin/guardar.php
 session_start();
 
@@ -49,9 +50,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $descripcion = $_POST['descripcion'];
     
     // Nuevos campos
-    $tipo_operacion = $_POST['tipo_operacion']; // Venta o Renta
-    $lat = !empty($_POST['lat']) ? $_POST['lat'] : null;
-    $lng = !empty($_POST['lng']) ? $_POST['lng'] : null; // Usamos 'lng' consistente con db.php
+    if($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $id = $_POST['id'];
+    $lat = !empty($_POST['lat']) ? (float)$_POST['lat'] : null;
+    $lng = !empty($_POST['lng']) ? (float)$_POST['lng'] : null;
+    $precio = (float)$_POST['precio'];// Usamos 'lng' consistente con db.php
     $destacado = isset($_POST['destacado']) ? 1 : 0;
 
     // Preparar SQL dinámico
