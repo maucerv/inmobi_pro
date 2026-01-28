@@ -28,4 +28,32 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = "Credenciales inválidas.";
     }
 }
-// ... resto del HTML igual
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Acceso Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>body{background:#0f172a;height:100vh;display:flex;align-items:center;justify-content:center;}</style>
+</head>
+<body>
+    <div class="card shadow-lg border-0" style="width: 350px;">
+        <div class="card-body p-4">
+            <h4 class="text-center mb-4 fw-bold text-dark">INICIAR SESIÓN</h4>
+            <?php if(!empty($error)): ?>
+                <div class="alert alert-danger py-2 small"><?= $error ?></div>
+            <?php endif; ?>
+            <form method="POST">
+                <div class="mb-3">
+                    <input type="email" name="user" class="form-control" placeholder="Correo electrónico" required>
+                </div>
+                <div class="mb-4">
+                    <input type="password" name="pass" class="form-control" placeholder="Contraseña" required>
+                </div>
+                <button type="submit" class="btn btn-dark w-100">Entrar</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
